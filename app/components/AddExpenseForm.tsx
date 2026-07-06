@@ -112,7 +112,7 @@ export default function AddExpenseForm({ onExpenseAdded, onOpenQRModal, contacts
               }`}
             >
               <ArrowUpRight className="h-4 w-4" />
-              Owed to Me (Receivable)
+              Receivable
             </button>
             <button
               type="button"
@@ -124,7 +124,7 @@ export default function AddExpenseForm({ onExpenseAdded, onOpenQRModal, contacts
               }`}
             >
               <ArrowDownLeft className="h-4 w-4" />
-              I Owe Them (Payable)
+              Payable
             </button>
           </div>
         </div>

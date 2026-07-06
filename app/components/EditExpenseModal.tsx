@@ -129,7 +129,7 @@ export default function EditExpenseModal({
                 }`}
               >
                 <ArrowUpRight className="h-4 w-4" />
-                Owed to Me
+                Receivable
               </button>
               <button
                 type="button"
@@ -141,7 +141,7 @@ export default function EditExpenseModal({
                 }`}
               >
                 <ArrowDownLeft className="h-4 w-4" />
-                I Owe Them
+                Payable
               </button>
             </div>
           </div>

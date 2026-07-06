@@ -135,14 +135,14 @@ export default function ExpenseSidebar({
               {netBalance >= 0 ? '+' : ''}₹{netBalance.toFixed(0)}
             </p>
           </div>
-          {/* Owed to Me */}
+          {/* Receivable */}
           <div className="flex-1 rounded-lg bg-slate-800/40 border border-white/5 px-2 py-1.5">
-            <span className="text-[9px] uppercase font-bold text-slate-500 block leading-none">Owed</span>
+            <span className="text-[9px] uppercase font-bold text-slate-500 block leading-none">Receivable</span>
             <p className="font-extrabold text-emerald-400 mt-0.5 leading-none">₹{pendingReceivable.toFixed(0)}</p>
           </div>
-          {/* I Owe */}
+          {/* Payable */}
           <div className="flex-1 rounded-lg bg-slate-800/40 border border-white/5 px-2 py-1.5">
-            <span className="text-[9px] uppercase font-bold text-slate-500 block leading-none">I Owe</span>
+            <span className="text-[9px] uppercase font-bold text-slate-500 block leading-none">Payable</span>
             <p className="font-extrabold text-rose-400 mt-0.5 leading-none">₹{pendingPayable.toFixed(0)}</p>
           </div>
         </div>
@@ -164,11 +164,11 @@ export default function ExpenseSidebar({
           {/* Breakdown split row */}
           <div className="grid grid-cols-2 gap-2.5">
             <div className="rounded-xl bg-slate-800/40 border border-white/5 p-3">
-              <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Owed to Me</span>
+              <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Receivable</span>
               <p className="text-sm font-extrabold text-emerald-400 mt-0.5">₹{pendingReceivable.toFixed(2)}</p>
             </div>
             <div className="rounded-xl bg-slate-800/40 border border-white/5 p-3">
-              <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">I Owe</span>
+              <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Payable</span>
               <p className="text-sm font-extrabold text-rose-400 mt-0.5">₹{pendingPayable.toFixed(2)}</p>
             </div>
           </div>
@@ -212,7 +212,7 @@ export default function ExpenseSidebar({
             {(['all', 'owes_me', 'i_owe'] as const).map((filter) => {
               const filterLabel = 
                 filter === 'all' ? 'All Types' :
-                filter === 'owes_me' ? 'Owed to Me' : 'I Owe';
+                filter === 'owes_me' ? 'Receivable' : 'Payable';
               return (
                 <button
                   key={filter}
@@ -274,7 +274,7 @@ export default function ExpenseSidebar({
                           ? 'bg-rose-500/20 text-rose-400 border border-rose-500/10'
                           : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/10'
                       }`}>
-                        {expense.direction === 'i_owe' ? 'You Owe' : 'Owes You'}
+                        {expense.direction === 'i_owe' ? 'Payable' : 'Receivable'}
                       </span>
                     </div>
 
