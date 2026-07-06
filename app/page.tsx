@@ -20,6 +20,7 @@ interface Expense {
   person_phone: string | null;
   status: string;
   created_at: string;
+  direction?: string;
 }
 
 export default function Home() {
@@ -53,11 +54,43 @@ export default function Home() {
   // Edit details
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
 
-  // Verify auth on mount
+  // Compute contacts list for autocomplete suggestions
+  const contacts = React.useMemo(() => {
+    const list: { name: string; phone: string }[] = [];
+    const seen = new Set<string>();
+    
+    for (const exp of expenses) {
+      if (exp.person_name) {
+        const nameClean = exp.person_name.trim();
+        const nameLower = nameClean.toLowerCase();
+        if (!seen.has(nameLower)) {
+          seen.add(nameLower);
+          list.push({
+            name: nameClean,
+            phone: exp.person_phone || '',
+          });
+        }
+      }
+    }
+    return list;
+  }, [expenses]);
+
+  // Verify auth on mount and load cache
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const auth = localStorage.getItem('expense_tracker_auth');
       setIsAuthenticated(auth === 'true');
+
+      // Load cached expenses immediately for instant load
+      const cached = localStorage.getItem('expense_tracker_cached_expenses');
+      if (cached) {
+        try {
+          setExpenses(JSON.parse(cached));
+          setLoading(false);
+        } catch (e) {
+          console.warn('Failed to parse cached expenses:', e);
+        }
+      }
     }
   }, []);
 
@@ -90,7 +123,11 @@ export default function Home() {
   // Fetch expenses from Supabase
   const fetchExpenses = useCallback(async () => {
     if (!isAuthenticated) return;
-    setLoading(true);
+    
+    // SWR logic: Only show loading spinner if cache is empty
+    const hasCache = expenses.length > 0;
+    if (!hasCache) setLoading(true);
+
     try {
       const { data, error } = await supabase
         .from('expenses')
@@ -98,19 +135,55 @@ export default function Home() {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setExpenses(data || []);
+      const fetchedExpenses = data || [];
+      setExpenses(fetchedExpenses);
+      
+      // Update local cache
+      localStorage.setItem('expense_tracker_cached_expenses', JSON.stringify(fetchedExpenses));
     } catch (err) {
       console.error('Failed to fetch expenses:', err);
     } finally {
       setLoading(false);
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, expenses.length]);
 
   useEffect(() => {
     if (isAuthenticated) {
       fetchExpenses();
       fetchSettings();
     }
+  }, [isAuthenticated, fetchExpenses, fetchSettings]);
+
+  // Realtime Syncing across devices
+  useEffect(() => {
+    if (!isAuthenticated) return;
+
+    const expensesChannel = supabase
+      .channel('expenses-realtime')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'expenses' },
+        () => {
+          fetchExpenses();
+        }
+      )
+      .subscribe();
+
+    const settingsChannel = supabase
+      .channel('settings-realtime')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'app_settings' },
+        () => {
+          fetchSettings();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(expensesChannel);
+      supabase.removeChannel(settingsChannel);
+    };
   }, [isAuthenticated, fetchExpenses, fetchSettings]);
 
   // Update payment status (Pending <-> Received)
@@ -155,6 +228,7 @@ export default function Home() {
       amount: number;
       person_name: string | null;
       person_phone: string | null;
+      direction: string;
       status: string;
     }
   ) => {
@@ -275,6 +349,7 @@ export default function Home() {
             <AddExpenseForm
               onExpenseAdded={fetchExpenses}
               onOpenQRModal={handleOpenQRModal}
+              contacts={contacts}
             />
           </div>
 
@@ -343,6 +418,7 @@ export default function Home() {
           setEditingExpense(null);
         }}
         expense={editingExpense}
+        contacts={contacts}
         onSave={handleEditSave}
       />
     </div>
