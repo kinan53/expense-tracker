@@ -102,61 +102,89 @@ export default function ExpenseSidebar({
   const sidebarContent = (
     <div className="flex h-full flex-col bg-slate-900 text-slate-100">
       {/* Sidebar Header */}
-      <div className="flex items-center justify-between border-b border-white/10 p-5">
+      <div className="flex items-center justify-between border-b border-white/10 p-4 md:p-5">
         <div>
-          <h2 className="text-lg font-bold text-white flex items-center gap-2">
-            <Users className="h-5 w-5 text-indigo-400" />
+          <h2 className="text-base md:text-lg font-bold text-white flex items-center gap-2">
+            <Users className="h-4.5 w-4.5 md:h-5 md:w-5 text-indigo-400" />
             Expense Tracker Entries
           </h2>
-          <p className="text-xs text-slate-400 mt-1">
+          <p className="text-[10px] md:text-xs text-slate-400 mt-0.5 md:mt-1">
             Tracking {expenses.length} total entries
           </p>
         </div>
         <button
           onClick={onClose}
-          className="rounded-lg p-1.5 text-slate-400 hover:bg-white/5 hover:text-white md:hidden transition-colors"
+          className="rounded-lg p-1 text-slate-400 hover:bg-white/5 hover:text-white md:hidden transition-colors"
         >
           <X className="h-5 w-5" />
         </button>
       </div>
 
       {/* Summary Stats */}
-      <div className="flex flex-col gap-3 p-5 border-b border-white/10 bg-slate-950/40">
-        {/* Net Balance row */}
-        <div className={`rounded-xl border p-4 transition duration-200 ${
-          netBalance >= 0 
-            ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' 
-            : 'bg-rose-500/10 border-rose-500/20 text-rose-400'
-        }`}>
-          <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Net Pending Balance</span>
-          <p className="text-2xl font-extrabold mt-0.5">
-            {netBalance >= 0 ? '+' : ''}₹{netBalance.toFixed(2)}
-          </p>
+      <div className="p-3 md:p-5 border-b border-white/10 bg-slate-950/40">
+        {/* Mobile View: 3 items in a single horizontal row */}
+        <div className="flex md:hidden gap-1.5 text-[11px] font-semibold">
+          {/* Net Balance */}
+          <div className={`flex-1 rounded-lg border px-2 py-1.5 transition duration-200 ${
+            netBalance >= 0 
+              ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' 
+              : 'bg-rose-500/10 border-rose-500/20 text-rose-400'
+          }`}>
+            <span className="text-[9px] uppercase font-bold text-slate-500 block leading-none">Net Bal</span>
+            <p className="font-extrabold mt-0.5 leading-none">
+              {netBalance >= 0 ? '+' : ''}₹{netBalance.toFixed(0)}
+            </p>
+          </div>
+          {/* Owed to Me */}
+          <div className="flex-1 rounded-lg bg-slate-800/40 border border-white/5 px-2 py-1.5">
+            <span className="text-[9px] uppercase font-bold text-slate-500 block leading-none">Owed</span>
+            <p className="font-extrabold text-emerald-400 mt-0.5 leading-none">₹{pendingReceivable.toFixed(0)}</p>
+          </div>
+          {/* I Owe */}
+          <div className="flex-1 rounded-lg bg-slate-800/40 border border-white/5 px-2 py-1.5">
+            <span className="text-[9px] uppercase font-bold text-slate-500 block leading-none">I Owe</span>
+            <p className="font-extrabold text-rose-400 mt-0.5 leading-none">₹{pendingPayable.toFixed(0)}</p>
+          </div>
         </div>
 
-        {/* Breakdown split row */}
-        <div className="grid grid-cols-2 gap-2.5">
-          <div className="rounded-xl bg-slate-800/40 border border-white/5 p-3">
-            <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Owed to Me</span>
-            <p className="text-sm font-extrabold text-emerald-400 mt-0.5">₹{pendingReceivable.toFixed(2)}</p>
+        {/* Desktop View: Stacked layout */}
+        <div className="hidden md:flex flex-col gap-3">
+          {/* Net Balance row */}
+          <div className={`rounded-xl border p-4 transition duration-200 ${
+            netBalance >= 0 
+              ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' 
+              : 'bg-rose-500/10 border-rose-500/20 text-rose-400'
+          }`}>
+            <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Net Pending Balance</span>
+            <p className="text-2xl font-extrabold mt-0.5">
+              {netBalance >= 0 ? '+' : ''}₹{netBalance.toFixed(2)}
+            </p>
           </div>
-          <div className="rounded-xl bg-slate-800/40 border border-white/5 p-3">
-            <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">I Owe</span>
-            <p className="text-sm font-extrabold text-rose-400 mt-0.5">₹{pendingPayable.toFixed(2)}</p>
+
+          {/* Breakdown split row */}
+          <div className="grid grid-cols-2 gap-2.5">
+            <div className="rounded-xl bg-slate-800/40 border border-white/5 p-3">
+              <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Owed to Me</span>
+              <p className="text-sm font-extrabold text-emerald-400 mt-0.5">₹{pendingReceivable.toFixed(2)}</p>
+            </div>
+            <div className="rounded-xl bg-slate-800/40 border border-white/5 p-3">
+              <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">I Owe</span>
+              <p className="text-sm font-extrabold text-rose-400 mt-0.5">₹{pendingPayable.toFixed(2)}</p>
+            </div>
           </div>
         </div>
       </div>
 
       {/* Search and Filter */}
-      <div className="space-y-3 p-5 border-b border-white/10">
+      <div className="space-y-2 md:space-y-3 p-3 md:p-5 border-b border-white/10">
         <div className="relative">
-          <Search className="absolute left-3 top-3 h-4 w-4 text-slate-500" />
+          <Search className="absolute left-3 top-2 md:top-3 h-4 w-4 text-slate-500" />
           <input
             type="text"
             placeholder="Search entries or names..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full rounded-xl border border-white/10 bg-white/5 pl-9 pr-4 py-2 text-sm text-white placeholder-slate-500 outline-hidden transition focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20"
+            className="w-full rounded-xl border border-white/10 bg-white/5 pl-9 pr-4 py-1.5 md:py-2 text-sm text-white placeholder-slate-500 outline-hidden transition focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20"
           />
         </div>
 
@@ -168,7 +196,7 @@ export default function ExpenseSidebar({
               <button
                 key={filter}
                 onClick={() => setStatusFilter(filter)}
-                className={`flex-1 rounded-lg py-1.5 text-xs font-semibold uppercase tracking-wider transition duration-150 cursor-pointer ${
+                className={`flex-1 rounded-lg py-1 md:py-1.5 text-xs font-semibold uppercase tracking-wider transition duration-150 cursor-pointer ${
                   statusFilter === filter
                     ? 'bg-indigo-500 text-white shadow-md shadow-indigo-500/10'
                     : 'bg-white/5 text-slate-400 hover:bg-white/10 hover:text-white'
@@ -189,7 +217,7 @@ export default function ExpenseSidebar({
                 <button
                   key={filter}
                   onClick={() => setDirectionFilter(filter)}
-                  className={`flex-1 rounded-lg py-1 text-[10px] font-bold uppercase tracking-wider transition duration-150 cursor-pointer ${
+                  className={`flex-1 rounded-lg py-0.5 md:py-1 text-[9px] md:text-[10px] font-bold uppercase tracking-wider transition duration-150 cursor-pointer ${
                     directionFilter === filter
                       ? 'bg-slate-700 text-white shadow-md border border-white/5'
                       : 'bg-white/5 text-slate-400 hover:bg-white/10 hover:text-white'
