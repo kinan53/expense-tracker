@@ -7,9 +7,6 @@ import {
   ReceiptText,
   ListFilter,
   CreditCard,
-  PlusCircle,
-  ArrowUpRight,
-  ArrowDownLeft,
 } from 'lucide-react';
 import { supabase } from './lib/supabase';
 import { openWhatsApp, generatePersonSummaryWhatsAppMessage } from './lib/whatsapp';
@@ -18,7 +15,6 @@ import { openWhatsApp, generatePersonSummaryWhatsAppMessage } from './lib/whatsa
 import LoginScreen from './components/LoginScreen';
 import AddExpenseForm from './components/AddExpenseForm';
 import ExpenseSidebar from './components/ExpenseSidebar';
-import PeopleBalancesView from './components/PeopleBalancesView';
 import PersonDetailsModal from './components/PersonDetailsModal';
 import AddPhoneModal from './components/AddPhoneModal';
 import QRModal from './components/QRModal';
@@ -40,9 +36,6 @@ export default function Home() {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [loading, setLoading] = useState(true);
-
-  // Main View Mode: 'form' (Add Entry) | 'owes_me' (Who Owes Me) | 'i_owe' (I Owe)
-  const [mainView, setMainView] = useState<'form' | 'owes_me' | 'i_owe'>('form');
 
   // Global Config Sync
   const [upiId, setUpiId] = useState('');
@@ -106,34 +99,6 @@ export default function Home() {
       }
     }
     return list;
-  }, [expenses]);
-
-  // Overall totals for quick summary badges
-  const { totalReceivable, totalPayable, countReceivablePeople, countPayablePeople } = useMemo(() => {
-    const recPeople = new Set<string>();
-    const payPeople = new Set<string>();
-    let rec = 0;
-    let pay = 0;
-
-    for (const exp of expenses) {
-      if (exp.status === 'pending') {
-        const amt = Number(exp.amount) || 0;
-        if (exp.direction === 'i_owe') {
-          pay += amt;
-          if (exp.person_name) payPeople.add(exp.person_name.toLowerCase().trim());
-        } else {
-          rec += amt;
-          if (exp.person_name) recPeople.add(exp.person_name.toLowerCase().trim());
-        }
-      }
-    }
-
-    return {
-      totalReceivable: rec,
-      totalPayable: pay,
-      countReceivablePeople: recPeople.size,
-      countPayablePeople: payPeople.size,
-    };
   }, [expenses]);
 
   // Verify auth on mount and load cache
@@ -494,7 +459,7 @@ export default function Home() {
       {/* Main Content Area */}
       <div className="flex flex-1 flex-col h-full overflow-y-auto">
         {/* Navigation Header */}
-        <header className="sticky top-0 z-30 flex items-center justify-between border-b border-white/10 bg-slate-950/80 px-4 md:px-6 py-3.5 backdrop-blur-md">
+        <header className="sticky top-0 z-30 flex items-center justify-between border-b border-white/10 bg-slate-950/80 px-4 md:px-6 py-4.5 backdrop-blur-md">
           <div className="flex items-center gap-2.5">
             <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 shadow-md shadow-indigo-500/20">
               <ReceiptText className="h-5 w-5 text-white" />
@@ -504,7 +469,7 @@ export default function Home() {
                 Expense Dashboard
               </h1>
               <span className="text-[10px] text-slate-400 mt-1 block">
-                Track debts, payments & QR codes
+                Simple Payment Tracker
               </span>
             </div>
           </div>
@@ -530,62 +495,8 @@ export default function Home() {
           </div>
         </header>
 
-        {/* Top Navigation Tabs */}
-        <div className="border-b border-white/10 bg-slate-950/50 px-4 md:px-6 py-2.5 backdrop-blur-xs">
-          <div className="max-w-4xl mx-auto flex items-center justify-start sm:justify-center gap-2 overflow-x-auto custom-scrollbar">
-            {/* New Entry Tab */}
-            <button
-              onClick={() => setMainView('form')}
-              className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition cursor-pointer whitespace-nowrap ${
-                mainView === 'form'
-                  ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/20'
-                  : 'bg-white/5 text-slate-300 hover:bg-white/10 hover:text-white'
-              }`}
-            >
-              <PlusCircle className="h-4 w-4" />
-              Add Entry
-            </button>
-
-            {/* Who Owes Me Tab */}
-            <button
-              onClick={() => setMainView('owes_me')}
-              className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition cursor-pointer whitespace-nowrap ${
-                mainView === 'owes_me'
-                  ? 'bg-emerald-600 text-white shadow-md shadow-emerald-500/20'
-                  : 'bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/15 border border-emerald-500/20'
-              }`}
-            >
-              <ArrowUpRight className="h-4 w-4" />
-              <span>Who Owes Me</span>
-              {totalReceivable > 0 && (
-                <span className="ml-1 rounded-full bg-emerald-400/20 text-emerald-300 px-2 py-0.5 text-[10px] font-extrabold">
-                  ₹{totalReceivable.toFixed(0)} ({countReceivablePeople})
-                </span>
-              )}
-            </button>
-
-            {/* I Owe Someone Tab */}
-            <button
-              onClick={() => setMainView('i_owe')}
-              className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition cursor-pointer whitespace-nowrap ${
-                mainView === 'i_owe'
-                  ? 'bg-rose-600 text-white shadow-md shadow-rose-500/20'
-                  : 'bg-rose-500/10 text-rose-300 hover:bg-rose-500/15 border border-rose-500/20'
-              }`}
-            >
-              <ArrowDownLeft className="h-4 w-4" />
-              <span>I Owe</span>
-              {totalPayable > 0 && (
-                <span className="ml-1 rounded-full bg-rose-400/20 text-rose-300 px-2 py-0.5 text-[10px] font-extrabold">
-                  ₹{totalPayable.toFixed(0)} ({countPayablePeople})
-                </span>
-              )}
-            </button>
-          </div>
-        </div>
-
         {/* Content Container */}
-        <main className="flex-1 p-4 md:p-6 flex flex-col items-center max-w-3xl mx-auto w-full space-y-6">
+        <main className="flex-1 p-4 md:p-6 flex flex-col items-center justify-center max-w-2xl mx-auto w-full space-y-6">
           {/* Welcome Alert / Info if UPI settings not set */}
           {!upiId && (
             <div className="w-full flex items-center gap-3 rounded-2xl border border-amber-500/20 bg-amber-500/5 p-4 text-sm text-amber-400">
@@ -599,71 +510,14 @@ export default function Home() {
             </div>
           )}
 
-          {/* View Mode Switching */}
-          {mainView === 'form' ? (
-            <div className="w-full space-y-4">
-              {/* Quick Summary Banner */}
-              <div className="grid grid-cols-2 gap-3">
-                <button
-                  onClick={() => setMainView('owes_me')}
-                  className="flex items-center justify-between rounded-xl bg-emerald-500/10 hover:bg-emerald-500/15 border border-emerald-500/20 p-3 text-left transition cursor-pointer"
-                >
-                  <div>
-                    <span className="text-[10px] uppercase font-bold text-emerald-400 tracking-wider flex items-center gap-1">
-                      <ArrowUpRight className="h-3 w-3" />
-                      Who Owes Me
-                    </span>
-                    <p className="text-lg font-extrabold text-white mt-0.5 leading-none">
-                      ₹{totalReceivable.toFixed(0)}
-                    </p>
-                    <span className="text-[10px] text-emerald-300/80 mt-1 block">
-                      {countReceivablePeople} people owe you
-                    </span>
-                  </div>
-                </button>
-
-                <button
-                  onClick={() => setMainView('i_owe')}
-                  className="flex items-center justify-between rounded-xl bg-rose-500/10 hover:bg-rose-500/15 border border-rose-500/20 p-3 text-left transition cursor-pointer"
-                >
-                  <div>
-                    <span className="text-[10px] uppercase font-bold text-rose-400 tracking-wider flex items-center gap-1">
-                      <ArrowDownLeft className="h-3 w-3" />
-                      I Owe
-                    </span>
-                    <p className="text-lg font-extrabold text-white mt-0.5 leading-none">
-                      ₹{totalPayable.toFixed(0)}
-                    </p>
-                    <span className="text-[10px] text-rose-300/80 mt-1 block">
-                      You owe {countPayablePeople} people
-                    </span>
-                  </div>
-                </button>
-              </div>
-
-              {/* Add Expense Form */}
-              <AddExpenseForm
-                onExpenseAdded={fetchExpenses}
-                onOpenQRModal={handleOpenQRModal}
-                contacts={contacts}
-              />
-            </div>
-          ) : (
-            /* People Balances & History View */
-            <div className="w-full">
-              <PeopleBalancesView
-                expenses={expenses}
-                activeTab={mainView}
-                onTabChange={(tab) => setMainView(tab)}
-                onSelectPerson={handleSelectPerson}
-                onOpenQRModal={handleOpenQRModal}
-                onRequestAddPhone={handleRequestAddPhone}
-                onAddNewEntry={() => setMainView('form')}
-                upiId={upiId}
-                payeeName={payeeName}
-              />
-            </div>
-          )}
+          {/* Add Expense Form */}
+          <div className="w-full">
+            <AddExpenseForm
+              onExpenseAdded={fetchExpenses}
+              onOpenQRModal={handleOpenQRModal}
+              contacts={contacts}
+            />
+          </div>
 
           {/* Mobile Entries FAB / Drawer Trigger */}
           <div className="w-full block md:hidden pt-2">
@@ -696,10 +550,6 @@ export default function Home() {
         onOpenQRModal={handleOpenQRModal}
         onSelectPerson={handleSelectPerson}
         onRequestAddPhone={handleRequestAddPhone}
-        onOpenPeopleView={(tab) => {
-          setMainView(tab);
-          setSidebarOpen(false);
-        }}
         upiId={upiId}
         payeeName={payeeName}
         isOpen={sidebarOpen}

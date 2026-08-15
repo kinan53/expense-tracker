@@ -13,6 +13,7 @@ import {
   Edit3,
   Send,
   ChevronRight,
+  Phone,
 } from 'lucide-react';
 import { generateExpenseWhatsAppMessage, openWhatsApp } from '../lib/whatsapp';
 
@@ -41,7 +42,6 @@ interface ExpenseSidebarProps {
   }) => void;
   onSelectPerson: (personName: string, personPhone?: string) => void;
   onRequestAddPhone: (personName: string, currentPhone?: string) => void;
-  onOpenPeopleView: (tab: 'owes_me' | 'i_owe') => void;
   upiId: string;
   payeeName: string;
   isOpen: boolean;
@@ -57,7 +57,6 @@ export default function ExpenseSidebar({
   onOpenQRModal,
   onSelectPerson,
   onRequestAddPhone,
-  onOpenPeopleView,
   upiId,
   payeeName,
   isOpen,
@@ -137,9 +136,23 @@ export default function ExpenseSidebar({
     }
 
     return Array.from(map.values())
-      .filter((p) => p.name.toLowerCase().includes(searchTerm.toLowerCase()))
+      .filter((p) => {
+        const matchesSearch =
+          p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          p.phone.includes(searchTerm);
+
+        if (!matchesSearch) return false;
+
+        if (directionFilter === 'owes_me') {
+          return p.pendingOwesMe > 0;
+        }
+        if (directionFilter === 'i_owe') {
+          return p.pendingIOwe > 0;
+        }
+        return true;
+      })
       .sort((a, b) => (b.pendingOwesMe + b.pendingIOwe) - (a.pendingOwesMe + a.pendingIOwe));
-  }, [expenses, searchTerm]);
+  }, [expenses, searchTerm, directionFilter]);
 
   const formatDate = (dateStr: string) => {
     try {
@@ -196,12 +209,19 @@ export default function ExpenseSidebar({
 
       {/* Summary Stats Cards */}
       <div className="p-3 md:p-4 border-b border-white/10 bg-slate-950/40 space-y-2.5">
-        {/* Clickable Quick Balance Cards that jump to People View */}
+        {/* Clickable Quick Balance Cards that filter people */}
         <div className="grid grid-cols-2 gap-2">
           {/* Who Owes Me Card */}
           <button
-            onClick={() => onOpenPeopleView('owes_me')}
-            className="flex flex-col text-left rounded-xl bg-emerald-500/10 hover:bg-emerald-500/15 border border-emerald-500/20 p-2.5 transition cursor-pointer"
+            onClick={() => {
+              setSidebarTab('people');
+              setDirectionFilter('owes_me');
+            }}
+            className={`flex flex-col text-left rounded-xl border p-2.5 transition cursor-pointer ${
+              sidebarTab === 'people' && directionFilter === 'owes_me'
+                ? 'bg-emerald-500/20 border-emerald-500/40 ring-1 ring-emerald-500/30'
+                : 'bg-emerald-500/10 hover:bg-emerald-500/15 border-emerald-500/20'
+            }`}
           >
             <span className="text-[9px] uppercase font-bold text-emerald-400 tracking-wider flex items-center justify-between">
               Who Owes Me <ChevronRight className="h-3 w-3" />
@@ -216,8 +236,15 @@ export default function ExpenseSidebar({
 
           {/* I Owe Someone Card */}
           <button
-            onClick={() => onOpenPeopleView('i_owe')}
-            className="flex flex-col text-left rounded-xl bg-rose-500/10 hover:bg-rose-500/15 border border-rose-500/20 p-2.5 transition cursor-pointer"
+            onClick={() => {
+              setSidebarTab('people');
+              setDirectionFilter('i_owe');
+            }}
+            className={`flex flex-col text-left rounded-xl border p-2.5 transition cursor-pointer ${
+              sidebarTab === 'people' && directionFilter === 'i_owe'
+                ? 'bg-rose-500/20 border-rose-500/40 ring-1 ring-rose-500/30'
+                : 'bg-rose-500/10 hover:bg-rose-500/15 border-rose-500/20'
+            }`}
           >
             <span className="text-[9px] uppercase font-bold text-rose-400 tracking-wider flex items-center justify-between">
               I Owe <ChevronRight className="h-3 w-3" />
@@ -251,7 +278,10 @@ export default function ExpenseSidebar({
       {/* Tabs: Entries vs People */}
       <div className="flex border-b border-white/10 px-3 pt-2 bg-slate-950/20">
         <button
-          onClick={() => setSidebarTab('entries')}
+          onClick={() => {
+            setSidebarTab('entries');
+            setDirectionFilter('all');
+          }}
           className={`flex-1 py-2 text-xs font-bold text-center border-b-2 transition cursor-pointer ${
             sidebarTab === 'entries'
               ? 'border-indigo-500 text-white'
@@ -261,7 +291,10 @@ export default function ExpenseSidebar({
           All Entries ({filteredExpenses.length})
         </button>
         <button
-          onClick={() => setSidebarTab('people')}
+          onClick={() => {
+            setSidebarTab('people');
+            setDirectionFilter('all');
+          }}
           className={`flex-1 py-2 text-xs font-bold text-center border-b-2 transition cursor-pointer ${
             sidebarTab === 'people'
               ? 'border-indigo-500 text-white'
@@ -289,9 +322,10 @@ export default function ExpenseSidebar({
           />
         </div>
 
-        {/* Filter Buttons (only for entries tab) */}
-        {sidebarTab === 'entries' && (
-          <div className="space-y-1.5">
+        {/* Filter Buttons */}
+        <div className="space-y-1.5">
+          {/* Status filter only for entries */}
+          {sidebarTab === 'entries' && (
             <div className="flex gap-1">
               {(['all', 'pending', 'received'] as const).map((filter) => (
                 <button
@@ -307,32 +341,33 @@ export default function ExpenseSidebar({
                 </button>
               ))}
             </div>
+          )}
 
-            <div className="flex gap-1">
-              {(['all', 'owes_me', 'i_owe'] as const).map((filter) => {
-                const label =
-                  filter === 'all'
-                    ? 'All'
-                    : filter === 'owes_me'
-                    ? 'Receivable'
-                    : 'Payable';
-                return (
-                  <button
-                    key={filter}
-                    onClick={() => setDirectionFilter(filter)}
-                    className={`flex-1 rounded-md py-0.5 text-[9px] font-bold uppercase tracking-wider transition cursor-pointer ${
-                      directionFilter === filter
-                        ? 'bg-slate-700 text-white border border-white/10'
-                        : 'bg-white/5 text-slate-400 hover:bg-white/10 hover:text-white'
-                    }`}
-                  >
-                    {label}
-                  </button>
-                );
-              })}
-            </div>
+          {/* Direction filter for both entries and people */}
+          <div className="flex gap-1">
+            {(['all', 'owes_me', 'i_owe'] as const).map((filter) => {
+              const label =
+                filter === 'all'
+                  ? 'All'
+                  : filter === 'owes_me'
+                  ? 'Who Owes Me'
+                  : 'I Owe';
+              return (
+                <button
+                  key={filter}
+                  onClick={() => setDirectionFilter(filter)}
+                  className={`flex-1 rounded-md py-0.5 text-[9px] font-bold uppercase tracking-wider transition cursor-pointer ${
+                    directionFilter === filter
+                      ? 'bg-slate-700 text-white border border-white/10'
+                      : 'bg-white/5 text-slate-400 hover:bg-white/10 hover:text-white'
+                  }`}
+                >
+                  {label}
+                </button>
+              );
+            })}
           </div>
-        )}
+        </div>
       </div>
 
       {/* Main List Area */}
@@ -367,9 +402,17 @@ export default function ExpenseSidebar({
                     <h4 className="font-bold text-white text-xs leading-tight group-hover:text-indigo-300 transition">
                       {person.name}
                     </h4>
-                    <span className="text-[10px] text-slate-400 block mt-0.5">
-                      {person.totalCount} {person.totalCount === 1 ? 'entry' : 'entries'}
-                    </span>
+                    <div className="flex items-center gap-1.5 mt-0.5">
+                      {person.phone && (
+                        <span className="text-[9px] text-emerald-400 font-mono flex items-center gap-0.5">
+                          <Phone className="h-2 w-2" />
+                          {person.phone}
+                        </span>
+                      )}
+                      <span className="text-[9px] text-slate-400">
+                        {person.totalCount} {person.totalCount === 1 ? 'entry' : 'entries'}
+                      </span>
+                    </div>
                   </div>
                 </div>
 
