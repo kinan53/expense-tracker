@@ -44,7 +44,7 @@ export default function AddExpenseForm({ onExpenseAdded, onOpenQRModal, contacts
     setError('');
 
     try {
-      const { data, error: insertError } = await supabase
+      const { error: insertError } = await supabase
         .from('expenses')
         .insert([
           {

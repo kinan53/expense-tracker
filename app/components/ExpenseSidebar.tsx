@@ -10,9 +10,11 @@ import {
   Search,
   Filter,
   Users,
-  Smartphone,
   Edit3,
+  Send,
+  ChevronRight,
 } from 'lucide-react';
+import { generateExpenseWhatsAppMessage, openWhatsApp } from '../lib/whatsapp';
 
 interface Expense {
   id: string;
@@ -37,6 +39,11 @@ interface ExpenseSidebarProps {
     personName: string;
     personPhone: string;
   }) => void;
+  onSelectPerson: (personName: string, personPhone?: string) => void;
+  onRequestAddPhone: (personName: string, currentPhone?: string) => void;
+  onOpenPeopleView: (tab: 'owes_me' | 'i_owe') => void;
+  upiId: string;
+  payeeName: string;
   isOpen: boolean;
   onClose: () => void;
 }
@@ -48,9 +55,15 @@ export default function ExpenseSidebar({
   onDeleteExpense,
   onEditExpense,
   onOpenQRModal,
+  onSelectPerson,
+  onRequestAddPhone,
+  onOpenPeopleView,
+  upiId,
+  payeeName,
   isOpen,
   onClose,
 }: ExpenseSidebarProps) {
+  const [sidebarTab, setSidebarTab] = useState<'entries' | 'people'>('entries');
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'received'>('all');
   const [directionFilter, setDirectionFilter] = useState<'all' | 'owes_me' | 'i_owe'>('all');
@@ -70,11 +83,11 @@ export default function ExpenseSidebar({
   }, [expenses, searchTerm, statusFilter, directionFilter]);
 
   const { pendingReceivable, pendingPayable, netBalance } = React.useMemo(() => {
-    const rec = filteredExpenses
+    const rec = expenses
       .filter((e) => e.status === 'pending' && e.direction !== 'i_owe')
       .reduce((sum, item) => sum + Number(item.amount), 0);
 
-    const pay = filteredExpenses
+    const pay = expenses
       .filter((e) => e.status === 'pending' && e.direction === 'i_owe')
       .reduce((sum, item) => sum + Number(item.amount), 0);
 
@@ -83,7 +96,50 @@ export default function ExpenseSidebar({
       pendingPayable: pay,
       netBalance: rec - pay,
     };
-  }, [filteredExpenses]);
+  }, [expenses]);
+
+  // Grouped people summaries for sidebar's people tab
+  const groupedPeople = React.useMemo(() => {
+    const map = new Map<string, {
+      name: string;
+      phone: string;
+      pendingOwesMe: number;
+      pendingIOwe: number;
+      totalCount: number;
+    }>();
+
+    for (const exp of expenses) {
+      if (!exp.person_name) continue;
+      const name = exp.person_name.trim();
+      const key = name.toLowerCase();
+
+      if (!map.has(key)) {
+        map.set(key, {
+          name,
+          phone: exp.person_phone || '',
+          pendingOwesMe: 0,
+          pendingIOwe: 0,
+          totalCount: 0,
+        });
+      }
+
+      const p = map.get(key)!;
+      p.totalCount++;
+      if (exp.person_phone && !p.phone) p.phone = exp.person_phone;
+
+      if (exp.status === 'pending') {
+        if (exp.direction === 'i_owe') {
+          p.pendingIOwe += Number(exp.amount) || 0;
+        } else {
+          p.pendingOwesMe += Number(exp.amount) || 0;
+        }
+      }
+    }
+
+    return Array.from(map.values())
+      .filter((p) => p.name.toLowerCase().includes(searchTerm.toLowerCase()))
+      .sort((a, b) => (b.pendingOwesMe + b.pendingIOwe) - (a.pendingOwesMe + a.pendingIOwe));
+  }, [expenses, searchTerm]);
 
   const formatDate = (dateStr: string) => {
     try {
@@ -94,9 +150,27 @@ export default function ExpenseSidebar({
         hour: '2-digit',
         minute: '2-digit',
       });
-    } catch (e) {
+    } catch {
       return dateStr;
     }
+  };
+
+  const handleSendWhatsAppForExpense = (exp: Expense) => {
+    if (!exp.person_name) return;
+    if (!exp.person_phone) {
+      onRequestAddPhone(exp.person_name, '');
+      return;
+    }
+
+    const message = generateExpenseWhatsAppMessage({
+      personName: exp.person_name,
+      amount: exp.amount,
+      description: exp.description,
+      upiId,
+      payeeName,
+    });
+
+    openWhatsApp(exp.person_phone, message);
   };
 
   const sidebarContent = (
@@ -106,227 +180,308 @@ export default function ExpenseSidebar({
         <div>
           <h2 className="text-base md:text-lg font-bold text-white flex items-center gap-2">
             <Users className="h-4.5 w-4.5 md:h-5 md:w-5 text-indigo-400" />
-            Expense Tracker Entries
+            Activity & Ledgers
           </h2>
-          <p className="text-[10px] md:text-xs text-slate-400 mt-0.5 md:mt-1">
-            Tracking {expenses.length} total entries
+          <p className="text-[10px] md:text-xs text-slate-400 mt-0.5">
+            {expenses.length} entries recorded
           </p>
         </div>
         <button
           onClick={onClose}
-          className="rounded-lg p-1 text-slate-400 hover:bg-white/5 hover:text-white md:hidden transition-colors"
+          className="rounded-lg p-1 text-slate-400 hover:bg-white/5 hover:text-white md:hidden transition-colors cursor-pointer"
         >
           <X className="h-5 w-5" />
         </button>
       </div>
 
-      {/* Summary Stats */}
-      <div className="p-3 md:p-5 border-b border-white/10 bg-slate-950/40">
-        {/* Mobile View: 3 items in a single horizontal row */}
-        <div className="flex md:hidden gap-1.5 text-[11px] font-semibold">
-          {/* Net Balance */}
-          <div className={`flex-1 rounded-lg border px-2 py-1.5 transition duration-200 ${
-            netBalance >= 0 
-              ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' 
-              : 'bg-rose-500/10 border-rose-500/20 text-rose-400'
-          }`}>
-            <span className="text-[9px] uppercase font-bold text-slate-500 block leading-none">Net Bal</span>
-            <p className="font-extrabold mt-0.5 leading-none">
-              {netBalance >= 0 ? '+' : ''}₹{netBalance.toFixed(0)}
+      {/* Summary Stats Cards */}
+      <div className="p-3 md:p-4 border-b border-white/10 bg-slate-950/40 space-y-2.5">
+        {/* Clickable Quick Balance Cards that jump to People View */}
+        <div className="grid grid-cols-2 gap-2">
+          {/* Who Owes Me Card */}
+          <button
+            onClick={() => onOpenPeopleView('owes_me')}
+            className="flex flex-col text-left rounded-xl bg-emerald-500/10 hover:bg-emerald-500/15 border border-emerald-500/20 p-2.5 transition cursor-pointer"
+          >
+            <span className="text-[9px] uppercase font-bold text-emerald-400 tracking-wider flex items-center justify-between">
+              Who Owes Me <ChevronRight className="h-3 w-3" />
+            </span>
+            <p className="text-base font-extrabold text-white mt-1 leading-none">
+              ₹{pendingReceivable.toFixed(0)}
             </p>
-          </div>
-          {/* Receivable */}
-          <div className="flex-1 rounded-lg bg-slate-800/40 border border-white/5 px-2 py-1.5">
-            <span className="text-[9px] uppercase font-bold text-slate-500 block leading-none">Receivable</span>
-            <p className="font-extrabold text-emerald-400 mt-0.5 leading-none">₹{pendingReceivable.toFixed(0)}</p>
-          </div>
-          {/* Payable */}
-          <div className="flex-1 rounded-lg bg-slate-800/40 border border-white/5 px-2 py-1.5">
-            <span className="text-[9px] uppercase font-bold text-slate-500 block leading-none">Payable</span>
-            <p className="font-extrabold text-rose-400 mt-0.5 leading-none">₹{pendingPayable.toFixed(0)}</p>
-          </div>
+            <span className="text-[10px] text-emerald-300/70 mt-1">
+              View details →
+            </span>
+          </button>
+
+          {/* I Owe Someone Card */}
+          <button
+            onClick={() => onOpenPeopleView('i_owe')}
+            className="flex flex-col text-left rounded-xl bg-rose-500/10 hover:bg-rose-500/15 border border-rose-500/20 p-2.5 transition cursor-pointer"
+          >
+            <span className="text-[9px] uppercase font-bold text-rose-400 tracking-wider flex items-center justify-between">
+              I Owe <ChevronRight className="h-3 w-3" />
+            </span>
+            <p className="text-base font-extrabold text-white mt-1 leading-none">
+              ₹{pendingPayable.toFixed(0)}
+            </p>
+            <span className="text-[10px] text-rose-300/70 mt-1">
+              View details →
+            </span>
+          </button>
         </div>
 
-        {/* Desktop View: Stacked layout */}
-        <div className="hidden md:flex flex-col gap-3">
-          {/* Net Balance row */}
-          <div className={`rounded-xl border p-4 transition duration-200 ${
-            netBalance >= 0 
-              ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' 
-              : 'bg-rose-500/10 border-rose-500/20 text-rose-400'
-          }`}>
-            <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Net Pending Balance</span>
-            <p className="text-2xl font-extrabold mt-0.5">
-              {netBalance >= 0 ? '+' : ''}₹{netBalance.toFixed(2)}
-            </p>
-          </div>
-
-          {/* Breakdown split row */}
-          <div className="grid grid-cols-2 gap-2.5">
-            <div className="rounded-xl bg-slate-800/40 border border-white/5 p-3">
-              <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Receivable</span>
-              <p className="text-sm font-extrabold text-emerald-400 mt-0.5">₹{pendingReceivable.toFixed(2)}</p>
-            </div>
-            <div className="rounded-xl bg-slate-800/40 border border-white/5 p-3">
-              <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Payable</span>
-              <p className="text-sm font-extrabold text-rose-400 mt-0.5">₹{pendingPayable.toFixed(2)}</p>
-            </div>
-          </div>
+        {/* Net Balance Pill */}
+        <div
+          className={`flex items-center justify-between rounded-lg px-3 py-1.5 text-xs font-semibold border ${
+            netBalance >= 0
+              ? 'bg-emerald-500/5 border-emerald-500/20 text-emerald-400'
+              : 'bg-rose-500/5 border-rose-500/20 text-rose-400'
+          }`}
+        >
+          <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">
+            Net Pending Balance
+          </span>
+          <span className="font-extrabold text-sm">
+            {netBalance >= 0 ? '+' : ''}₹{netBalance.toFixed(2)}
+          </span>
         </div>
       </div>
 
-      {/* Search and Filter */}
-      <div className="space-y-2 md:space-y-3 p-3 md:p-5 border-b border-white/10">
+      {/* Tabs: Entries vs People */}
+      <div className="flex border-b border-white/10 px-3 pt-2 bg-slate-950/20">
+        <button
+          onClick={() => setSidebarTab('entries')}
+          className={`flex-1 py-2 text-xs font-bold text-center border-b-2 transition cursor-pointer ${
+            sidebarTab === 'entries'
+              ? 'border-indigo-500 text-white'
+              : 'border-transparent text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          All Entries ({filteredExpenses.length})
+        </button>
+        <button
+          onClick={() => setSidebarTab('people')}
+          className={`flex-1 py-2 text-xs font-bold text-center border-b-2 transition cursor-pointer ${
+            sidebarTab === 'people'
+              ? 'border-indigo-500 text-white'
+              : 'border-transparent text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          By Person ({groupedPeople.length})
+        </button>
+      </div>
+
+      {/* Search and Filters */}
+      <div className="space-y-2 p-3 border-b border-white/10">
         <div className="relative">
-          <Search className="absolute left-3 top-2 md:top-3 h-4 w-4 text-slate-500" />
+          <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-slate-500" />
           <input
             type="text"
-            placeholder="Search entries or names..."
+            placeholder={
+              sidebarTab === 'entries'
+                ? 'Search description or person...'
+                : 'Search people...'
+            }
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full rounded-xl border border-white/10 bg-white/5 pl-9 pr-4 py-1.5 md:py-2 text-sm text-white placeholder-slate-500 outline-hidden transition focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20"
+            className="w-full rounded-xl border border-white/10 bg-white/5 pl-8 pr-3 py-1.5 text-xs text-white placeholder-slate-500 outline-hidden transition focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20"
           />
         </div>
 
-        {/* Filter Buttons */}
-        <div className="space-y-2">
-          {/* Status Filters */}
-          <div className="flex gap-1.5">
-            {(['all', 'pending', 'received'] as const).map((filter) => (
-              <button
-                key={filter}
-                onClick={() => setStatusFilter(filter)}
-                className={`flex-1 rounded-lg py-1 md:py-1.5 text-xs font-semibold uppercase tracking-wider transition duration-150 cursor-pointer ${
-                  statusFilter === filter
-                    ? 'bg-indigo-500 text-white shadow-md shadow-indigo-500/10'
-                    : 'bg-white/5 text-slate-400 hover:bg-white/10 hover:text-white'
-                }`}
-              >
-                {filter}
-              </button>
-            ))}
-          </div>
-
-          {/* Type / Direction Filters */}
-          <div className="flex gap-1.5">
-            {(['all', 'owes_me', 'i_owe'] as const).map((filter) => {
-              const filterLabel = 
-                filter === 'all' ? 'All Types' :
-                filter === 'owes_me' ? 'Receivable' : 'Payable';
-              return (
+        {/* Filter Buttons (only for entries tab) */}
+        {sidebarTab === 'entries' && (
+          <div className="space-y-1.5">
+            <div className="flex gap-1">
+              {(['all', 'pending', 'received'] as const).map((filter) => (
                 <button
                   key={filter}
-                  onClick={() => setDirectionFilter(filter)}
-                  className={`flex-1 rounded-lg py-0.5 md:py-1 text-[9px] md:text-[10px] font-bold uppercase tracking-wider transition duration-150 cursor-pointer ${
-                    directionFilter === filter
-                      ? 'bg-slate-700 text-white shadow-md border border-white/5'
+                  onClick={() => setStatusFilter(filter)}
+                  className={`flex-1 rounded-md py-1 text-[10px] font-bold uppercase tracking-wider transition cursor-pointer ${
+                    statusFilter === filter
+                      ? 'bg-indigo-500 text-white shadow-sm'
                       : 'bg-white/5 text-slate-400 hover:bg-white/10 hover:text-white'
                   }`}
                 >
-                  {filterLabel}
+                  {filter}
                 </button>
-              );
-            })}
+              ))}
+            </div>
+
+            <div className="flex gap-1">
+              {(['all', 'owes_me', 'i_owe'] as const).map((filter) => {
+                const label =
+                  filter === 'all'
+                    ? 'All'
+                    : filter === 'owes_me'
+                    ? 'Receivable'
+                    : 'Payable';
+                return (
+                  <button
+                    key={filter}
+                    onClick={() => setDirectionFilter(filter)}
+                    className={`flex-1 rounded-md py-0.5 text-[9px] font-bold uppercase tracking-wider transition cursor-pointer ${
+                      directionFilter === filter
+                        ? 'bg-slate-700 text-white border border-white/10'
+                        : 'bg-white/5 text-slate-400 hover:bg-white/10 hover:text-white'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
-      {/* Entries List */}
-      <div className="flex-1 overflow-y-auto p-5 space-y-3.5 custom-scrollbar">
+      {/* Main List Area */}
+      <div className="flex-1 overflow-y-auto p-3 space-y-2.5 custom-scrollbar">
         {loading ? (
           <div className="flex flex-col items-center justify-center py-10 text-slate-500">
-            <svg className="h-8 w-8 animate-spin" fill="none" viewBox="0 0 24 24">
+            <svg className="h-7 w-7 animate-spin" fill="none" viewBox="0 0 24 24">
               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
             </svg>
-            <span className="mt-3 text-xs">Loading entries...</span>
+            <span className="mt-2 text-xs">Loading data...</span>
           </div>
+        ) : sidebarTab === 'people' ? (
+          /* People Grouped List */
+          groupedPeople.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-8 text-center text-slate-500 border border-dashed border-white/5 rounded-xl p-4">
+              <Users className="h-7 w-7 text-slate-600 mb-2" />
+              <p className="text-xs font-medium text-slate-400">No people records found</p>
+            </div>
+          ) : (
+            groupedPeople.map((person) => (
+              <div
+                key={person.name}
+                onClick={() => onSelectPerson(person.name, person.phone)}
+                className="group flex items-center justify-between rounded-xl border border-white/10 bg-slate-900/80 p-3 hover:border-indigo-500/40 hover:bg-slate-800/60 transition cursor-pointer"
+              >
+                <div className="flex items-center gap-2.5">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-500/20 text-indigo-300 font-bold text-xs">
+                    {person.name.charAt(0).toUpperCase()}
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-white text-xs leading-tight group-hover:text-indigo-300 transition">
+                      {person.name}
+                    </h4>
+                    <span className="text-[10px] text-slate-400 block mt-0.5">
+                      {person.totalCount} {person.totalCount === 1 ? 'entry' : 'entries'}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="text-right">
+                  {person.pendingOwesMe > 0 && (
+                    <span className="block text-xs font-extrabold text-emerald-400 leading-tight">
+                      +₹{person.pendingOwesMe.toFixed(0)}
+                    </span>
+                  )}
+                  {person.pendingIOwe > 0 && (
+                    <span className="block text-xs font-extrabold text-rose-400 leading-tight">
+                      -₹{person.pendingIOwe.toFixed(0)}
+                    </span>
+                  )}
+                  {person.pendingOwesMe === 0 && person.pendingIOwe === 0 && (
+                    <span className="text-[10px] text-slate-500 font-medium">Settled</span>
+                  )}
+                </div>
+              </div>
+            ))
+          )
         ) : filteredExpenses.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-10 text-center text-slate-500 border border-dashed border-white/5 rounded-xl p-4">
-            <Filter className="h-8 w-8 text-slate-600 mb-2" />
-            <p className="text-sm font-medium text-slate-400">No entries found</p>
-            <p className="text-xs text-slate-500 mt-1">Try resetting filters or adding a new expense.</p>
+          <div className="flex flex-col items-center justify-center py-8 text-center text-slate-500 border border-dashed border-white/5 rounded-xl p-4">
+            <Filter className="h-7 w-7 text-slate-600 mb-2" />
+            <p className="text-xs font-medium text-slate-400">No entries match filters</p>
           </div>
         ) : (
           filteredExpenses.map((expense) => {
             const isPending = expense.status === 'pending';
+            const isOwesMe = expense.direction !== 'i_owe';
+
             return (
               <div
                 key={expense.id}
-                className="group relative overflow-hidden rounded-xl border border-white/10 bg-slate-900 p-4 transition duration-200 hover:border-white/20 hover:bg-slate-800/50"
+                className="group relative overflow-hidden rounded-xl border border-white/10 bg-slate-900/90 p-3 transition duration-150 hover:border-white/20 hover:bg-slate-800/50"
               >
-                {/* Visual Accent border for status */}
+                {/* Visual Accent */}
                 <div
                   className={`absolute left-0 top-0 bottom-0 w-1 ${
-                    expense.direction === 'i_owe'
-                      ? (isPending ? 'bg-rose-500/80' : 'bg-slate-500/80')
-                      : (isPending ? 'bg-amber-500/80' : 'bg-emerald-500/80')
+                    !isOwesMe
+                      ? isPending ? 'bg-rose-500' : 'bg-slate-600'
+                      : isPending ? 'bg-amber-500' : 'bg-emerald-500'
                   }`}
                 />
 
                 <div className="flex items-start justify-between pl-1">
                   <div>
-                    <h4 className="font-semibold text-white text-sm line-clamp-1">{expense.description}</h4>
-                    <div className="flex items-center gap-2 mt-1">
-                      <span className="text-[10px] text-slate-400 block">{formatDate(expense.created_at)}</span>
-                      <span className={`inline-flex items-center text-[9px] font-extrabold uppercase tracking-wider px-1.5 py-0.2 rounded-sm ${
-                        expense.direction === 'i_owe'
-                          ? 'bg-rose-500/20 text-rose-400 border border-rose-500/10'
-                          : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/10'
+                    <h4 className="font-semibold text-white text-xs line-clamp-1">
+                      {expense.description}
+                    </h4>
+                    <div className="flex items-center gap-1.5 mt-0.5">
+                      <span className="text-[9px] text-slate-400 block">
+                        {formatDate(expense.created_at)}
+                      </span>
+                      <span className={`inline-flex items-center text-[8px] font-extrabold uppercase tracking-wider px-1 py-0.2 rounded-xs ${
+                        isOwesMe
+                          ? 'bg-emerald-500/20 text-emerald-400'
+                          : 'bg-rose-500/20 text-rose-400'
                       }`}>
-                        {expense.direction === 'i_owe' ? 'Payable' : 'Receivable'}
+                        {isOwesMe ? 'Receivable' : 'Payable'}
                       </span>
                     </div>
 
-                    {/* Person Details */}
+                    {/* Person Link */}
                     {expense.person_name && (
-                      <div className="mt-2.5 flex flex-wrap items-center gap-x-2 gap-y-1">
-                        <span className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-medium ${
-                          expense.direction === 'i_owe'
-                            ? 'bg-rose-500/10 text-rose-300'
-                            : 'bg-emerald-500/10 text-emerald-300'
-                        }`}>
-                          <Users className="h-2.5 w-2.5" />
-                          {expense.person_name}
-                        </span>
-                        {expense.person_phone && (
-                          <span className="inline-flex items-center gap-1 text-[10px] text-slate-400">
-                            <Smartphone className="h-2.5 w-2.5" />
-                            {expense.person_phone}
-                          </span>
-                        )}
-                      </div>
+                      <button
+                        onClick={() =>
+                          onSelectPerson(expense.person_name!, expense.person_phone || undefined)
+                        }
+                        className={`mt-1.5 inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[9px] font-medium transition cursor-pointer ${
+                          !isOwesMe
+                            ? 'bg-rose-500/10 text-rose-300 hover:bg-rose-500/20'
+                            : 'bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20'
+                        }`}
+                        title="Click to view full history for this person"
+                      >
+                        <Users className="h-2.5 w-2.5" />
+                        {expense.person_name}
+                      </button>
                     )}
                   </div>
 
-                  <div className="text-right pl-2">
-                    <span className={`text-base font-extrabold ${
-                      expense.direction === 'i_owe' ? 'text-rose-400' : 'text-emerald-400'
-                    }`}>
+                  <div className="text-right pl-2 shrink-0">
+                    <span
+                      className={`text-sm font-extrabold ${
+                        isOwesMe ? 'text-emerald-400' : 'text-rose-400'
+                      }`}
+                    >
                       ₹{Number(expense.amount).toFixed(2)}
                     </span>
-                    <div className="mt-2">
+                    <div className="mt-1">
                       <button
                         onClick={() =>
                           onUpdateStatus(expense.id, isPending ? 'received' : 'pending')
                         }
-                        className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider transition duration-150 cursor-pointer ${
+                        className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider transition cursor-pointer ${
                           isPending
-                            ? (expense.direction === 'i_owe'
-                                ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20 hover:bg-rose-500/20'
-                                : 'bg-amber-500/10 text-amber-400 border border-amber-500/20 hover:bg-amber-500/20')
+                            ? !isOwesMe
+                              ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20 hover:bg-rose-500/20'
+                              : 'bg-amber-500/10 text-amber-400 border border-amber-500/20 hover:bg-amber-500/20'
                             : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20'
                         }`}
                       >
                         {isPending ? (
                           <>
-                            <Clock className="h-2.5 w-2.5" />
+                            <Clock className="h-2 w-2" />
                             Pending
                           </>
                         ) : (
                           <>
-                            <CheckCircle className="h-2.5 w-2.5" />
-                            {expense.direction === 'i_owe' ? 'Paid' : 'Received'}
+                            <CheckCircle className="h-2 w-2" />
+                            {isOwesMe ? 'Received' : 'Paid'}
                           </>
                         )}
                       </button>
@@ -335,9 +490,9 @@ export default function ExpenseSidebar({
                 </div>
 
                 {/* Entry Action Buttons */}
-                <div className="mt-3.5 flex items-center justify-end gap-2 border-t border-white/5 pt-3 opacity-90 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity duration-200">
-                  {/* Option to send GPay QR code (whatsapp style) */}
-                  {expense.direction !== 'i_owe' && (
+                <div className="mt-2.5 flex items-center justify-end gap-1.5 border-t border-white/5 pt-2">
+                  {/* Share QR */}
+                  {isOwesMe && (
                     <button
                       onClick={() =>
                         onOpenQRModal({
@@ -347,34 +502,45 @@ export default function ExpenseSidebar({
                           personPhone: expense.person_phone || '',
                         })
                       }
-                      className="flex items-center gap-1 rounded-lg bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/20 px-2.5 py-1.5 text-xs font-semibold text-indigo-300 transition duration-150 cursor-pointer"
+                      className="flex items-center gap-1 rounded-md bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/20 px-2 py-1 text-[10px] font-semibold text-indigo-300 transition cursor-pointer"
+                      title="Share QR"
                     >
-                      <QrCode className="h-3.5 w-3.5" />
-                      Share QR
+                      <QrCode className="h-3 w-3" />
+                      QR
                     </button>
                   )}
 
-                  {/* Edit Expense */}
+                  {/* Send WhatsApp */}
+                  {expense.person_name && (
+                    <button
+                      onClick={() => handleSendWhatsAppForExpense(expense)}
+                      className="flex items-center gap-1 rounded-md bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 px-2 py-1 text-[10px] font-semibold text-emerald-400 transition cursor-pointer"
+                      title="Send WhatsApp reminder"
+                    >
+                      <Send className="h-3 w-3" />
+                    </button>
+                  )}
+
+                  {/* Edit */}
                   <button
                     onClick={() => onEditExpense(expense)}
-                    className="flex items-center gap-1 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 px-2.5 py-1.5 text-xs font-semibold text-slate-300 transition duration-150 cursor-pointer"
-                    title="Edit Entry"
+                    className="flex items-center gap-1 rounded-md bg-white/5 hover:bg-white/10 border border-white/10 px-2 py-1 text-[10px] font-semibold text-slate-300 transition cursor-pointer"
+                    title="Edit entry"
                   >
-                    <Edit3 className="h-3.5 w-3.5" />
-                    Edit
+                    <Edit3 className="h-3 w-3" />
                   </button>
 
-                  {/* Delete Expense */}
+                  {/* Delete */}
                   <button
                     onClick={() => {
-                      if (confirm('Are you sure you want to delete this expense entry?')) {
+                      if (confirm('Delete this entry?')) {
                         onDeleteExpense(expense.id);
                       }
                     }}
-                    className="rounded-lg bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 p-1.5 text-red-400 transition duration-150 cursor-pointer"
-                    title="Delete Entry"
+                    className="rounded-md bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 p-1 text-red-400 transition cursor-pointer"
+                    title="Delete entry"
                   >
-                    <Trash2 className="h-3.5 w-3.5" />
+                    <Trash2 className="h-3 w-3" />
                   </button>
                 </div>
               </div>
@@ -387,12 +553,12 @@ export default function ExpenseSidebar({
 
   return (
     <>
-      {/* Desktop Sidebar (visible on md and up) */}
+      {/* Desktop Sidebar */}
       <aside className="hidden w-80 md:w-96 shrink-0 border-l border-white/10 md:flex flex-col h-screen sticky top-0">
         {sidebarContent}
       </aside>
 
-      {/* Mobile Drawer (visible on mobile when toggled open) */}
+      {/* Mobile Drawer */}
       <div
         className={`fixed inset-0 z-40 bg-black/60 backdrop-blur-xs transition-opacity duration-300 md:hidden ${
           isOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
