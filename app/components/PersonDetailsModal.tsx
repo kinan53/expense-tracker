@@ -5,8 +5,6 @@ import {
   X,
   QrCode,
   Send,
-  CheckCircle,
-  Clock,
   Trash2,
   Edit3,
   Phone,
@@ -75,20 +73,17 @@ export default function PersonDetailsModal({
 
   if (!isOpen || !personName) return null;
 
-  // Filter expenses strictly for this person
   const personExpenses = expenses.filter(
     (e) =>
       e.person_name &&
       e.person_name.trim().toLowerCase() === personName.trim().toLowerCase()
   );
 
-  // Latest phone associated with this person
   const currentPhone =
     personPhone ||
     personExpenses.find((e) => e.person_phone)?.person_phone ||
     '';
 
-  // Calculate totals
   const pendingReceivables = personExpenses
     .filter((e) => e.status === 'pending' && e.direction !== 'i_owe')
     .reduce((sum, e) => sum + Number(e.amount), 0);
@@ -107,7 +102,6 @@ export default function PersonDetailsModal({
 
   const netPending = pendingReceivables - pendingPayables;
 
-  // Filtered list
   const filteredList = personExpenses.filter((e) => {
     if (filter === 'pending') return e.status === 'pending';
     if (filter === 'settled') return e.status === 'received';
@@ -122,14 +116,12 @@ export default function PersonDetailsModal({
       return date.toLocaleDateString('en-IN', {
         day: 'numeric',
         month: 'short',
-        year: 'numeric',
       });
     } catch {
       return dateStr;
     }
   };
 
-  // WhatsApp reminder handler
   const handleSendWhatsAppSummary = () => {
     const isReceivable = pendingReceivables >= pendingPayables;
     const totalAmount = isReceivable ? pendingReceivables : pendingPayables;
@@ -174,7 +166,7 @@ export default function PersonDetailsModal({
     const desc =
       personExpenses.filter((e) => e.status === 'pending' && e.direction !== 'i_owe').length > 1
         ? `Settlement (${personExpenses.filter((e) => e.status === 'pending' && e.direction !== 'i_owe').length} items)`
-        : personExpenses.find((e) => e.status === 'pending' && e.direction !== 'i_owe')?.description || 'Total Balance';
+        : personExpenses.find((e) => e.status === 'pending' && e.direction !== 'i_owe')?.description || 'Balance';
 
     onOpenQRModal({
       amount: pendingReceivables,
@@ -185,7 +177,7 @@ export default function PersonDetailsModal({
   };
 
   const handleSettleAll = async () => {
-    if (!confirm(`Are you sure you want to mark all pending items for ${personName} as settled?`)) {
+    if (!confirm(`Mark all pending entries for ${personName} as settled?`)) {
       return;
     }
     setSettling(true);
@@ -199,42 +191,43 @@ export default function PersonDetailsModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-3 md:p-6 backdrop-blur-xs animate-fade-in">
-      <div className="relative flex flex-col w-full max-w-2xl max-h-[92vh] overflow-hidden rounded-2xl border border-white/10 bg-slate-900 shadow-2xl">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-xs p-0 sm:p-4">
+      <div className="absolute inset-0" onClick={onClose} />
+
+      <div className="relative w-full sm:max-w-xl rounded-t-3xl sm:rounded-2xl border border-white/10 bg-[#12141a] shadow-2xl safe-area-bottom z-10 max-h-[92dvh] flex flex-col overflow-hidden">
+        {/* Mobile handle indicator */}
+        <div className="mx-auto mb-2 mt-3 h-1 w-10 shrink-0 rounded-full bg-white/20 sm:hidden" />
+
         {/* Modal Header */}
-        <div className="flex items-center justify-between border-b border-white/10 bg-slate-950/60 p-4 md:p-5">
+        <div className="flex items-center justify-between border-b border-white/[0.06] p-4 sm:p-5 shrink-0">
           <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 text-white font-extrabold text-base shadow-md shadow-indigo-500/20">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/[0.06] border border-white/10 text-white font-semibold text-sm">
               {personName.charAt(0).toUpperCase()}
             </div>
             <div>
-              <div className="flex items-center gap-2">
-                <h3 className="text-lg md:text-xl font-bold text-white leading-tight">
-                  {personName}
-                </h3>
-              </div>
-              <div className="flex items-center gap-2 mt-1">
+              <h3 className="text-base font-semibold tracking-tight text-white leading-tight">
+                {personName}
+              </h3>
+              <div className="flex items-center gap-2 mt-0.5">
                 {currentPhone ? (
                   <button
                     onClick={() => onRequestAddPhone(personName, currentPhone)}
-                    className="inline-flex items-center gap-1.5 rounded-md bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 text-xs text-emerald-400 hover:bg-emerald-500/20 transition cursor-pointer"
-                    title="Click to edit WhatsApp number"
+                    className="inline-flex items-center gap-1 text-[11px] text-zinc-400 hover:text-white transition cursor-pointer"
                   >
-                    <Phone className="h-3 w-3" />
+                    <Phone className="h-2.5 w-2.5" />
                     <span>{currentPhone}</span>
-                    <Edit3 className="h-2.5 w-2.5 opacity-60 ml-0.5" />
                   </button>
                 ) : (
                   <button
                     onClick={() => onRequestAddPhone(personName, '')}
-                    className="inline-flex items-center gap-1 rounded-md bg-white/5 border border-white/10 px-2 py-0.5 text-xs text-slate-400 hover:bg-white/10 hover:text-white transition cursor-pointer"
+                    className="inline-flex items-center gap-1 text-[11px] text-zinc-500 hover:text-zinc-300 transition cursor-pointer"
                   >
-                    <Plus className="h-3 w-3" />
-                    <span>Add WhatsApp Number</span>
+                    <Plus className="h-2.5 w-2.5" />
+                    <span>Add Phone</span>
                   </button>
                 )}
-                <span className="text-xs text-slate-500">•</span>
-                <span className="text-xs text-slate-400">
+                <span className="text-zinc-600 text-[10px]">•</span>
+                <span className="text-[11px] text-zinc-500">
                   {personExpenses.length} {personExpenses.length === 1 ? 'entry' : 'entries'}
                 </span>
               </div>
@@ -243,129 +236,105 @@ export default function PersonDetailsModal({
 
           <button
             onClick={onClose}
-            className="rounded-xl p-2 text-slate-400 hover:bg-white/5 hover:text-white transition cursor-pointer"
+            className="rounded-lg p-1.5 text-zinc-400 hover:text-white transition cursor-pointer"
           >
-            <X className="h-5 w-5" />
+            <X className="h-4 w-4" />
           </button>
         </div>
 
-        {/* Summary Balance Cards */}
-        <div className="p-4 md:p-5 border-b border-white/10 bg-slate-950/30 space-y-3">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {/* Receivables Card (Owes You) */}
-            <div className={`rounded-xl border p-3.5 transition ${
-              pendingReceivables > 0 
-                ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' 
-                : 'bg-slate-800/30 border-white/5 text-slate-400'
-            }`}>
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] uppercase font-bold tracking-wider text-slate-400 flex items-center gap-1">
-                  <ArrowUpRight className="h-3.5 w-3.5 text-emerald-400" />
-                  Owes You (Receivable)
-                </span>
-                {settledReceivables > 0 && (
-                  <span className="text-[10px] text-slate-500">
-                    Settled: ₹{settledReceivables.toFixed(2)}
-                  </span>
-                )}
+        {/* Summary Balance & Quick Actions */}
+        <div className="p-4 sm:p-5 border-b border-white/[0.06] bg-[#0d0e14] shrink-0 space-y-3">
+          <div className="grid grid-cols-2 gap-2.5">
+            <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-3">
+              <div className="flex items-center gap-1 text-[11px] text-zinc-400">
+                <ArrowUpRight className="h-3 w-3 text-emerald-400" />
+                <span>Owes you</span>
               </div>
-              <p className="text-2xl font-extrabold text-white mt-1">
+              <p className="text-lg font-bold tabular-nums text-white mt-0.5">
                 ₹{pendingReceivables.toFixed(2)}
               </p>
+              {settledReceivables > 0 && (
+                <span className="text-[10px] text-zinc-500">
+                  Settled: ₹{settledReceivables.toFixed(0)}
+                </span>
+              )}
             </div>
 
-            {/* Payables Card (You Owe) */}
-            <div className={`rounded-xl border p-3.5 transition ${
-              pendingPayables > 0 
-                ? 'bg-rose-500/10 border-rose-500/30 text-rose-400' 
-                : 'bg-slate-800/30 border-white/5 text-slate-400'
-            }`}>
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] uppercase font-bold tracking-wider text-slate-400 flex items-center gap-1">
-                  <ArrowDownLeft className="h-3.5 w-3.5 text-rose-400" />
-                  You Owe (Payable)
-                </span>
-                {settledPayables > 0 && (
-                  <span className="text-[10px] text-slate-500">
-                    Settled: ₹{settledPayables.toFixed(2)}
-                  </span>
-                )}
+            <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-3">
+              <div className="flex items-center gap-1 text-[11px] text-zinc-400">
+                <ArrowDownLeft className="h-3 w-3 text-rose-400" />
+                <span>You owe</span>
               </div>
-              <p className="text-2xl font-extrabold text-white mt-1">
+              <p className="text-lg font-bold tabular-nums text-white mt-0.5">
                 ₹{pendingPayables.toFixed(2)}
               </p>
+              {settledPayables > 0 && (
+                <span className="text-[10px] text-zinc-500">
+                  Settled: ₹{settledPayables.toFixed(0)}
+                </span>
+              )}
             </div>
           </div>
 
-          {/* Net Balance indicator if both sides exist */}
+          {/* Net Note */}
           {pendingReceivables > 0 && pendingPayables > 0 && (
-            <div className={`flex items-center justify-between rounded-lg px-3 py-1.5 text-xs font-semibold border ${
-              netPending >= 0
-                ? 'bg-emerald-500/5 border-emerald-500/20 text-emerald-300'
-                : 'bg-rose-500/5 border-rose-500/20 text-rose-300'
-            }`}>
-              <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">
-                Net Pending Difference
-              </span>
-              <span className="font-extrabold text-sm">
-                {netPending >= 0 ? `They owe you net +₹${netPending.toFixed(2)}` : `You owe net -₹${Math.abs(netPending).toFixed(2)}`}
+            <div className="flex items-center justify-between rounded-lg bg-white/[0.03] px-3 py-1.5 text-xs">
+              <span className="text-zinc-400">Net Balance</span>
+              <span className="font-semibold text-white tabular-nums">
+                {netPending >= 0 ? `+₹${netPending.toFixed(2)}` : `-₹${Math.abs(netPending).toFixed(2)}`}
               </span>
             </div>
           )}
 
-          {/* Quick Action Bar for Person */}
-          <div className="flex flex-wrap items-center gap-2 pt-1">
-            {/* Generate Total QR (when they owe money) */}
+          {/* Action Row */}
+          <div className="flex flex-wrap gap-2 pt-1">
             {pendingReceivables > 0 && (
               <button
                 onClick={handleOpenTotalQR}
-                className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 rounded-xl bg-indigo-500/15 hover:bg-indigo-500/25 border border-indigo-500/30 px-3.5 py-2 text-xs font-bold text-indigo-300 transition duration-150 cursor-pointer active:scale-98"
+                className="flex-1 flex items-center justify-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.04] hover:bg-white/[0.08] py-2 text-xs font-medium text-white transition cursor-pointer"
               >
-                <QrCode className="h-4 w-4" />
-                Generate Total QR (₹{pendingReceivables.toFixed(2)})
+                <QrCode className="h-3.5 w-3.5" />
+                <span>Total QR (₹{pendingReceivables.toFixed(0)})</span>
               </button>
             )}
 
-            {/* Send WhatsApp Reminder */}
             {(pendingReceivables > 0 || pendingPayables > 0) && (
               <button
                 onClick={handleSendWhatsAppSummary}
-                className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 px-3.5 py-2 text-xs font-bold text-white transition duration-150 cursor-pointer active:scale-98 shadow-md shadow-emerald-500/20"
+                className="flex-1 flex items-center justify-center gap-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 py-2 text-xs font-semibold text-zinc-950 transition cursor-pointer"
               >
-                <Send className="h-4 w-4" />
-                Send on WhatsApp
+                <Send className="h-3.5 w-3.5" />
+                <span>WhatsApp Summary</span>
               </button>
             )}
 
-            {/* Settle All Button */}
             {pendingCount > 0 && (
               <button
                 onClick={handleSettleAll}
                 disabled={settling}
-                className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 px-3.5 py-2 text-xs font-semibold text-slate-300 transition duration-150 cursor-pointer active:scale-98 disabled:opacity-50"
+                className="flex-1 flex items-center justify-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.04] hover:bg-white/[0.08] py-2 text-xs font-medium text-zinc-300 transition cursor-pointer disabled:opacity-50"
               >
-                <CheckCheck className="h-4 w-4 text-emerald-400" />
-                Settle All Pending ({pendingCount})
+                <CheckCheck className="h-3.5 w-3.5 text-emerald-400" />
+                <span>Settle All ({pendingCount})</span>
               </button>
             )}
           </div>
         </div>
 
-        {/* History Header & Filters */}
-        <div className="flex items-center justify-between border-b border-white/10 px-4 md:px-5 py-3 bg-slate-950/40">
-          <span className="text-xs font-bold uppercase tracking-wider text-slate-300">
-            Transaction History ({filteredList.length})
+        {/* Filter pills */}
+        <div className="flex items-center justify-between border-b border-white/[0.06] px-4 py-2.5 bg-[#12141a] shrink-0">
+          <span className="text-xs text-zinc-400 font-medium">
+            History ({filteredList.length})
           </span>
-
-          <div className="flex gap-1 bg-white/5 p-1 rounded-lg border border-white/5">
+          <div className="flex rounded-lg bg-white/[0.04] p-0.5">
             {(['all', 'pending', 'settled'] as const).map((tab) => (
               <button
                 key={tab}
                 onClick={() => setFilter(tab)}
-                className={`rounded-md px-2.5 py-1 text-[11px] font-semibold capitalize transition cursor-pointer ${
+                className={`rounded-md px-2.5 py-1 text-xs capitalize transition cursor-pointer ${
                   filter === tab
-                    ? 'bg-indigo-500 text-white shadow-sm'
-                    : 'text-slate-400 hover:text-white'
+                    ? 'bg-white/10 text-white font-medium'
+                    : 'text-zinc-500 hover:text-zinc-300'
                 }`}
               >
                 {tab}
@@ -374,17 +343,12 @@ export default function PersonDetailsModal({
           </div>
         </div>
 
-        {/* Transaction History List */}
-        <div className="flex-1 overflow-y-auto p-4 md:p-5 space-y-3 custom-scrollbar">
+        {/* Transaction History */}
+        <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-2.5 custom-scrollbar">
           {filteredList.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 text-center text-slate-500">
-              <AlertCircle className="h-8 w-8 text-slate-600 mb-2" />
-              <p className="text-sm font-medium text-slate-400">No transactions found</p>
-              <p className="text-xs text-slate-500 mt-0.5">
-                {filter === 'all'
-                  ? 'No entries recorded for this person yet.'
-                  : `No ${filter} entries found.`}
-              </p>
+            <div className="py-12 text-center text-zinc-500">
+              <AlertCircle className="mx-auto h-6 w-6 text-zinc-600 mb-1.5" />
+              <p className="text-xs">No transactions in this view</p>
             </div>
           ) : (
             filteredList.map((item) => {
@@ -394,76 +358,53 @@ export default function PersonDetailsModal({
               return (
                 <div
                   key={item.id}
-                  className="relative overflow-hidden rounded-xl border border-white/10 bg-slate-900/90 p-3.5 transition duration-150 hover:border-white/20 hover:bg-slate-800/40"
+                  className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-3 hover:bg-white/[0.04] transition"
                 >
-                  {/* Status indicator bar */}
-                  <div
-                    className={`absolute left-0 top-0 bottom-0 w-1 ${
-                      isOwesMe
-                        ? isPending ? 'bg-amber-500' : 'bg-emerald-500'
-                        : isPending ? 'bg-rose-500' : 'bg-slate-500'
-                    }`}
-                  />
-
-                  <div className="flex items-start justify-between pl-1.5">
+                  <div className="flex items-start justify-between">
                     <div>
-                      <h4 className="font-semibold text-white text-sm">
+                      <h4 className="text-xs font-medium text-white line-clamp-1">
                         {item.description}
                       </h4>
                       <div className="flex items-center gap-2 mt-1">
-                        <span className="text-[11px] text-slate-400 flex items-center gap-1">
-                          <Calendar className="h-3 w-3 text-slate-500" />
+                        <span className="text-[11px] text-zinc-500 flex items-center gap-1">
+                          <Calendar className="h-2.5 w-2.5" />
                           {formatDate(item.created_at)}
                         </span>
-                        <span className={`inline-flex items-center text-[9px] font-extrabold uppercase tracking-wider px-1.5 py-0.2 rounded-sm ${
+                        <span className={`text-[10px] font-medium px-1.5 py-0.2 rounded-sm ${
                           isOwesMe
-                            ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/10'
-                            : 'bg-rose-500/20 text-rose-400 border border-rose-500/10'
+                            ? 'text-emerald-400 bg-emerald-500/10'
+                            : 'text-rose-400 bg-rose-500/10'
                         }`}>
                           {isOwesMe ? 'Receivable' : 'Payable'}
                         </span>
                       </div>
                     </div>
 
-                    <div className="text-right pl-2">
-                      <span className={`text-base font-extrabold ${
+                    <div className="text-right">
+                      <span className={`text-sm font-semibold tabular-nums ${
                         isOwesMe ? 'text-emerald-400' : 'text-rose-400'
                       }`}>
-                        ₹{Number(item.amount).toFixed(2)}
+                        {isOwesMe ? '+' : '-'}₹{Number(item.amount).toFixed(2)}
                       </span>
                       <div className="mt-1">
                         <button
                           onClick={() =>
                             onUpdateStatus(item.id, isPending ? 'received' : 'pending')
                           }
-                          className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider transition cursor-pointer ${
+                          className={`rounded-full px-2 py-0.5 text-[10px] font-medium transition cursor-pointer ${
                             isPending
-                              ? isOwesMe
-                                ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20 hover:bg-amber-500/20'
-                                : 'bg-rose-500/10 text-rose-400 border border-rose-500/20 hover:bg-rose-500/20'
-                              : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20'
+                              ? 'bg-amber-500/15 text-amber-400 border border-amber-500/30'
+                              : 'bg-zinc-800 text-zinc-400 border border-zinc-700'
                           }`}
-                          title="Click to toggle status"
                         >
-                          {isPending ? (
-                            <>
-                              <Clock className="h-2.5 w-2.5" />
-                              Pending
-                            </>
-                          ) : (
-                            <>
-                              <CheckCircle className="h-2.5 w-2.5" />
-                              {isOwesMe ? 'Received' : 'Paid'}
-                            </>
-                          )}
+                          {isPending ? 'Pending' : 'Settled'}
                         </button>
                       </div>
                     </div>
                   </div>
 
-                  {/* Actions footer */}
-                  <div className="mt-3 flex items-center justify-end gap-1.5 border-t border-white/5 pt-2.5">
-                    {/* Share QR (if owes me & pending) */}
+                  {/* Quick actions for this row */}
+                  <div className="mt-2.5 flex items-center justify-end gap-1.5 border-t border-white/[0.04] pt-2">
                     {isOwesMe && (
                       <button
                         onClick={() =>
@@ -474,45 +415,41 @@ export default function PersonDetailsModal({
                             personPhone: currentPhone,
                           })
                         }
-                        className="flex items-center gap-1 rounded-lg bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/20 px-2 py-1 text-[11px] font-semibold text-indigo-300 transition cursor-pointer"
-                        title="Generate QR code for this entry"
+                        className="rounded-lg bg-white/[0.04] hover:bg-white/[0.08] px-2 py-1 text-[11px] text-zinc-300 transition cursor-pointer flex items-center gap-1"
+                        title="QR Code"
                       >
                         <QrCode className="h-3 w-3" />
-                        QR
+                        <span>QR</span>
                       </button>
                     )}
 
-                    {/* WhatsApp */}
                     <button
                       onClick={() => handleSendSingleExpenseWhatsApp(item)}
-                      className="flex items-center gap-1 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 px-2 py-1 text-[11px] font-semibold text-emerald-400 transition cursor-pointer"
-                      title="Send WhatsApp for this entry"
+                      className="rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 px-2 py-1 text-[11px] transition cursor-pointer flex items-center gap-1"
+                      title="WhatsApp Reminder"
                     >
                       <Send className="h-3 w-3" />
-                      WhatsApp
+                      <span>WhatsApp</span>
                     </button>
 
-                    {/* Edit */}
                     <button
                       onClick={() => onEditExpense(item)}
-                      className="flex items-center gap-1 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 px-2 py-1 text-[11px] font-semibold text-slate-300 transition cursor-pointer"
-                      title="Edit this entry"
+                      className="rounded-lg p-1 text-zinc-400 hover:text-white transition cursor-pointer"
+                      title="Edit"
                     >
-                      <Edit3 className="h-3 w-3" />
-                      Edit
+                      <Edit3 className="h-3.5 w-3.5" />
                     </button>
 
-                    {/* Delete */}
                     <button
                       onClick={() => {
                         if (confirm(`Delete "${item.description}"?`)) {
                           onDeleteExpense(item.id);
                         }
                       }}
-                      className="rounded-lg bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 p-1 text-red-400 transition cursor-pointer"
-                      title="Delete entry"
+                      className="rounded-lg p-1 text-zinc-500 hover:text-rose-400 transition cursor-pointer"
+                      title="Delete"
                     >
-                      <Trash2 className="h-3 w-3" />
+                      <Trash2 className="h-3.5 w-3.5" />
                     </button>
                   </div>
                 </div>

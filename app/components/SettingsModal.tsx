@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { X, Save, Shield, CreditCard, User } from 'lucide-react';
+import { X, Check, CreditCard, User, Lock } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
 interface SettingsModalProps {
@@ -22,7 +22,7 @@ export default function SettingsModal({
   const [upiId, setUpiId] = useState('');
   const [payeeName, setPayeeName] = useState('');
   const [customPassword, setCustomPassword] = useState('');
-  const [showSavedToast, setShowSavedToast] = useState(false);
+  const [saved, setSaved] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -31,6 +31,7 @@ export default function SettingsModal({
       if (typeof window !== 'undefined') {
         setCustomPassword(localStorage.getItem('expense_tracker_custom_password') || '');
       }
+      setSaved(false);
     }
   }, [isOpen, initialUpiId, initialPayeeName]);
 
@@ -43,7 +44,7 @@ export default function SettingsModal({
 
     localStorage.setItem('expense_tracker_upi_id', cleanUpiId);
     localStorage.setItem('expense_tracker_payee_name', cleanPayeeName);
-    
+
     if (customPassword.trim()) {
       localStorage.setItem('expense_tracker_custom_password', customPassword.trim());
     } else {
@@ -51,121 +52,126 @@ export default function SettingsModal({
     }
 
     try {
-      // Attempt syncing to Supabase table
       await supabase.from('app_settings').upsert({
         id: 1,
         upi_id: cleanUpiId,
         payee_name: cleanPayeeName,
       });
     } catch (err) {
-      console.warn('Failed to sync settings to Supabase database (ensure table app_settings exists):', err);
+      console.warn('Failed to sync settings to Supabase table:', err);
     }
 
     onSave(cleanUpiId, cleanPayeeName);
-
-    setShowSavedToast(true);
+    setSaved(true);
     setTimeout(() => {
-      setShowSavedToast(false);
       onClose();
-    }, 1000);
+    }, 700);
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs">
-      <div className="relative w-full max-w-md transform overflow-hidden rounded-2xl border border-white/10 bg-slate-900 p-6 shadow-2xl transition-all">
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-white/10 pb-4">
-          <h2 className="text-xl font-bold text-white">App Settings</h2>
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-xs p-0 sm:p-4">
+      <div className="absolute inset-0" onClick={onClose} />
+
+      <div className="relative w-full sm:max-w-md rounded-t-3xl sm:rounded-2xl border border-white/10 bg-[#12141a] p-5 sm:p-6 shadow-2xl safe-area-bottom z-10 max-h-[90dvh] overflow-y-auto no-scrollbar">
+        {/* Mobile drag handle */}
+        <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-white/20 sm:hidden" />
+
+        <div className="flex items-center justify-between pb-3 border-b border-white/[0.06]">
+          <h2 className="text-sm font-semibold tracking-tight text-white">
+            Settings
+          </h2>
           <button
             onClick={onClose}
-            className="rounded-lg p-1.5 text-slate-400 hover:bg-white/5 hover:text-white transition-colors"
+            className="rounded-lg p-1.5 text-zinc-400 hover:text-white transition cursor-pointer"
           >
-            <X className="h-5 w-5" />
+            <X className="h-4 w-4" />
           </button>
         </div>
 
-        {/* Form */}
         <form onSubmit={handleSave} className="mt-4 space-y-4">
           {/* UPI ID */}
-          <div className="space-y-1">
-            <label className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-slate-400">
-              <CreditCard className="h-3.5 w-3.5 text-indigo-400" />
-              Google Pay / UPI ID
+          <div>
+            <label className="block text-[11px] font-medium text-zinc-400 mb-1">
+              UPI / Google Pay ID
             </label>
-            <input
-              type="text"
-              value={upiId}
-              onChange={(e) => setUpiId(e.target.value)}
-              placeholder="yourname@okaxis"
-              required
-              className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-white placeholder-slate-500 outline-hidden transition duration-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
-            />
-            <p className="text-[11px] text-slate-500">
-              Used to generate Google Pay QR codes and deep links.
+            <div className="relative">
+              <CreditCard className="absolute left-3.5 top-3 h-4 w-4 text-zinc-500" />
+              <input
+                type="text"
+                required
+                value={upiId}
+                onChange={(e) => setUpiId(e.target.value)}
+                placeholder="yourname@okaxis"
+                className="w-full rounded-xl border border-white/10 bg-white/[0.03] pl-9 pr-3.5 py-2.5 text-white placeholder-zinc-500 outline-none transition focus:border-white/30 focus:ring-1 focus:ring-white/20"
+              />
+            </div>
+            <p className="mt-1 text-[11px] text-zinc-500">
+              Used to generate direct UPI QR codes and links for repayments.
             </p>
           </div>
 
           {/* Payee Name */}
-          <div className="space-y-1">
-            <label className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-slate-400">
-              <User className="h-3.5 w-3.5 text-indigo-400" />
-              Payee Name (Your Name)
+          <div>
+            <label className="block text-[11px] font-medium text-zinc-400 mb-1">
+              Payee Name (Your display name)
             </label>
-            <input
-              type="text"
-              value={payeeName}
-              onChange={(e) => setPayeeName(e.target.value)}
-              placeholder="John Doe"
-              required
-              className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-white placeholder-slate-500 outline-hidden transition duration-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
-            />
+            <div className="relative">
+              <User className="absolute left-3.5 top-3 h-4 w-4 text-zinc-500" />
+              <input
+                type="text"
+                required
+                value={payeeName}
+                onChange={(e) => setPayeeName(e.target.value)}
+                placeholder="Alex Smith"
+                className="w-full rounded-xl border border-white/10 bg-white/[0.03] pl-9 pr-3.5 py-2.5 text-white placeholder-zinc-500 outline-none transition focus:border-white/30 focus:ring-1 focus:ring-white/20"
+              />
+            </div>
           </div>
 
-          {/* Custom Admin Password */}
-          <div className="space-y-1">
-            <label className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-slate-400">
-              <Shield className="h-3.5 w-3.5 text-indigo-400" />
-              Custom Admin Password
+          {/* Custom Password */}
+          <div>
+            <label className="block text-[11px] font-medium text-zinc-400 mb-1">
+              Admin Passcode
             </label>
-            <input
-              type="password"
-              value={customPassword}
-              onChange={(e) => setCustomPassword(e.target.value)}
-              placeholder="Leave empty to use env default"
-              className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-white placeholder-slate-500 outline-hidden transition duration-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
-            />
+            <div className="relative">
+              <Lock className="absolute left-3.5 top-3 h-4 w-4 text-zinc-500" />
+              <input
+                type="password"
+                value={customPassword}
+                onChange={(e) => setCustomPassword(e.target.value)}
+                placeholder="Default: admin123"
+                className="w-full rounded-xl border border-white/10 bg-white/[0.03] pl-9 pr-3.5 py-2.5 text-white placeholder-zinc-500 outline-none transition focus:border-white/30 focus:ring-1 focus:ring-white/20"
+              />
+            </div>
+            <p className="mt-1 text-[11px] text-zinc-500">
+              Leave blank to keep the default system passcode.
+            </p>
           </div>
 
-          {/* Action buttons */}
-          <div className="mt-6 flex gap-3 border-t border-white/10 pt-4">
+          {/* Actions */}
+          <div className="pt-2 flex gap-2.5">
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 rounded-xl border border-white/10 bg-transparent py-2.5 text-sm font-semibold text-slate-300 hover:bg-white/5 hover:text-white transition"
+              className="flex-1 rounded-xl border border-white/10 bg-transparent py-2.5 text-xs font-semibold text-zinc-400 hover:text-white transition cursor-pointer"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-indigo-500 py-2.5 text-sm font-semibold text-white hover:bg-indigo-600 active:scale-98 transition"
+              className="flex-1 flex items-center justify-center gap-1.5 rounded-xl bg-white py-2.5 text-xs font-semibold text-zinc-950 hover:bg-zinc-200 active:scale-[0.98] transition cursor-pointer"
             >
-              <Save className="h-4 w-4" />
-              Save Settings
+              {saved ? (
+                <>
+                  <Check className="h-3.5 w-3.5 text-emerald-600" />
+                  <span>Saved</span>
+                </>
+              ) : (
+                <span>Save Settings</span>
+              )}
             </button>
           </div>
         </form>
-
-        {/* Success Toast inside modal */}
-        {showSavedToast && (
-          <div className="absolute inset-0 flex items-center justify-center bg-slate-900/90 backdrop-blur-xs animate-fade-in">
-            <div className="flex flex-col items-center gap-2 text-emerald-400">
-              <div className="rounded-full bg-emerald-500/10 p-3 ring-4 ring-emerald-500/5">
-                <Save className="h-6 w-6" />
-              </div>
-              <span className="font-semibold text-lg text-white">Settings Saved!</span>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );

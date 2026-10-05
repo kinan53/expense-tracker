@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import QRCode from 'qrcode';
-import { X, Send, AlertTriangle, Check, Copy, Download, Plus } from 'lucide-react';
+import { X, Send, Copy, Download, Check, AlertCircle } from 'lucide-react';
 import { generateUpiUrl, generateExpenseWhatsAppMessage, openWhatsApp } from '../lib/whatsapp';
 
 interface QRModalProps {
@@ -15,6 +15,7 @@ interface QRModalProps {
   upiId: string;
   payeeName: string;
   onRequestAddPhone?: (personName: string, currentPhone?: string) => void;
+  onOpenSettings?: () => void;
 }
 
 export default function QRModal({
@@ -27,10 +28,10 @@ export default function QRModal({
   upiId,
   payeeName,
   onRequestAddPhone,
+  onOpenSettings,
 }: QRModalProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [copied, setCopied] = useState(false);
-  const [error, setError] = useState('');
 
   const upiLink = generateUpiUrl(upiId, payeeName, amount, description);
 
@@ -40,18 +41,12 @@ export default function QRModal({
         canvasRef.current,
         upiLink,
         {
-          width: 240,
+          width: 220,
           margin: 1.5,
           color: {
-            dark: '#0f172a', // slate-900
+            dark: '#000000',
             light: '#ffffff',
           },
-        },
-        (err) => {
-          if (err) {
-            console.error('Failed to generate QR code', err);
-            setError('Failed to generate QR code');
-          }
         }
       );
     }
@@ -77,7 +72,7 @@ export default function QRModal({
   };
 
   const handleCopyLink = () => {
-    if (navigator.clipboard) {
+    if (navigator.clipboard && upiLink) {
       navigator.clipboard.writeText(upiLink);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
@@ -95,108 +90,122 @@ export default function QRModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-xs animate-fade-in">
-      <div className="relative w-full max-w-sm transform overflow-hidden rounded-2xl border border-white/10 bg-slate-900 p-6 shadow-2xl transition-all">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-xs transition-opacity p-0 sm:p-4">
+      {/* Backdrop tap to close */}
+      <div className="absolute inset-0" onClick={onClose} />
+
+      {/* Modal / Bottom Sheet */}
+      <div className="relative w-full sm:max-w-sm rounded-t-3xl sm:rounded-2xl border border-white/10 bg-[#12141a] p-5 sm:p-6 shadow-2xl safe-area-bottom z-10 max-h-[90dvh] overflow-y-auto no-scrollbar">
+        {/* Mobile handle indicator */}
+        <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-white/20 sm:hidden" />
+
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-white/10 pb-3">
-          <h3 className="text-lg font-bold text-white">Payment QR Code</h3>
+        <div className="flex items-center justify-between pb-3 border-b border-white/[0.06]">
+          <h3 className="text-sm font-semibold tracking-tight text-white">
+            Payment QR
+          </h3>
           <button
             onClick={onClose}
-            className="rounded-lg p-1 text-slate-400 hover:bg-white/5 hover:text-white transition-colors cursor-pointer"
+            className="rounded-lg p-1.5 text-zinc-400 hover:text-white transition cursor-pointer"
           >
-            <X className="h-5 w-5" />
+            <X className="h-4 w-4" />
           </button>
         </div>
 
-        {/* Content */}
         {!upiId ? (
-          <div className="my-6 flex flex-col items-center justify-center text-center">
-            <div className="rounded-full bg-amber-500/10 p-3 text-amber-400 ring-4 ring-amber-500/5">
-              <AlertTriangle className="h-8 w-8" />
+          <div className="py-8 text-center space-y-3">
+            <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-amber-500/10 text-amber-400">
+              <AlertCircle className="h-5 w-5" />
             </div>
-            <p className="mt-4 font-semibold text-white">UPI ID Config Missing</p>
-            <p className="mt-2 text-xs text-slate-400 px-4">
-              Please click the <strong>Settings</strong> icon in the header to set your UPI/GPay ID and Payee Name.
-            </p>
+            <div>
+              <p className="text-sm font-medium text-white">UPI ID Required</p>
+              <p className="text-xs text-zinc-400 mt-1 max-w-xs mx-auto">
+                Set your UPI/GPay ID to generate payment QR codes and payment links.
+              </p>
+            </div>
+            {onOpenSettings && (
+              <button
+                onClick={() => {
+                  onClose();
+                  onOpenSettings();
+                }}
+                className="inline-flex rounded-xl bg-white px-4 py-2 text-xs font-semibold text-zinc-950 hover:bg-zinc-200 transition cursor-pointer"
+              >
+                Configure Settings
+              </button>
+            )}
           </div>
         ) : (
           <div className="mt-4 flex flex-col items-center">
-            {/* Payment Details */}
-            <div className="mb-4 text-center">
-              <span className="text-3xl font-extrabold text-emerald-400">₹{amount.toFixed(2)}</span>
-              <p className="text-xs font-semibold text-slate-300 mt-1 line-clamp-1">
-                {description || 'Expense Payment'}
+            {/* Amount & Description */}
+            <div className="text-center mb-4">
+              <div className="text-2xl font-bold tracking-tight tabular-nums text-white">
+                ₹{Number(amount).toFixed(2)}
+              </div>
+              <p className="text-xs text-zinc-400 mt-0.5 line-clamp-1">
+                {description || 'Payment'}
               </p>
               {personName && (
-                <div className="flex items-center justify-center gap-1.5 mt-1">
-                  <span className="text-xs text-slate-400">For: {personName}</span>
+                <div className="mt-1 flex items-center justify-center gap-1.5 text-xs text-zinc-500">
+                  <span>For {personName}</span>
                   {personPhone ? (
-                    <span className="text-[11px] text-emerald-400 font-mono">({personPhone})</span>
+                    <span className="text-zinc-400 font-mono">({personPhone})</span>
                   ) : onRequestAddPhone ? (
                     <button
                       onClick={() => onRequestAddPhone(personName, '')}
-                      className="text-[10px] text-indigo-400 hover:underline inline-flex items-center gap-0.5 cursor-pointer"
+                      className="text-xs text-zinc-400 hover:text-white underline cursor-pointer"
                     >
-                      <Plus className="h-2.5 w-2.5" />
-                      Add Phone
+                      Add phone
                     </button>
                   ) : null}
                 </div>
               )}
             </div>
 
-            {/* QR Canvas */}
-            <div className="relative rounded-2xl bg-white p-4 shadow-inner">
-              <canvas ref={canvasRef} className="h-48 w-48" />
+            {/* QR Canvas Box */}
+            <div className="rounded-2xl bg-white p-3.5 shadow-sm">
+              <canvas ref={canvasRef} className="h-48 w-48 block" />
             </div>
 
-            {error && (
-              <p className="mt-2 text-xs text-red-400">{error}</p>
-            )}
-
-            {/* QR Scanner info */}
-            <p className="mt-3 text-[11px] text-slate-400 text-center">
-              Scan with GPay, PhonePe, Paytm, or any UPI App
+            <p className="mt-3 text-[11px] text-zinc-500 text-center">
+              Scan with GPay, PhonePe, Paytm, or any UPI app
             </p>
 
             {/* Actions */}
-            <div className="mt-5 flex w-full flex-col gap-2">
-              {/* WhatsApp Action Button */}
+            <div className="mt-5 w-full space-y-2">
               <button
                 onClick={handleSendWhatsApp}
-                className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-500 py-2.5 text-xs font-bold text-white hover:bg-emerald-600 active:scale-98 transition duration-150 cursor-pointer shadow-md shadow-emerald-500/20"
+                className="w-full flex items-center justify-center gap-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 py-3 text-xs font-semibold text-zinc-950 active:scale-[0.98] transition cursor-pointer"
               >
                 <Send className="h-3.5 w-3.5" />
-                {personPhone ? 'Send via WhatsApp' : 'Send via WhatsApp (Add Phone)'}
+                <span>{personPhone ? 'Send via WhatsApp' : 'Send via WhatsApp (Add Phone)'}</span>
               </button>
 
               <div className="flex gap-2">
-                {/* Copy UPI Link */}
                 <button
                   onClick={handleCopyLink}
-                  className="flex-1 flex items-center justify-center gap-1.5 rounded-xl border border-white/10 bg-white/5 py-2 text-xs font-medium text-slate-200 hover:bg-white/10 hover:text-white transition duration-150 cursor-pointer"
+                  className="flex-1 flex items-center justify-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.04] py-2.5 text-xs font-medium text-zinc-300 hover:bg-white/[0.08] transition cursor-pointer"
                 >
                   {copied ? (
                     <>
                       <Check className="h-3.5 w-3.5 text-emerald-400" />
-                      Copied!
+                      <span>Copied</span>
                     </>
                   ) : (
                     <>
-                      <Copy className="h-3.5 w-3.5 text-slate-400" />
-                      Copy Link
+                      <Copy className="h-3.5 w-3.5 text-zinc-400" />
+                      <span>Copy UPI Link</span>
                     </>
                   )}
                 </button>
 
-                {/* Download QR Image */}
                 <button
                   onClick={handleDownloadQR}
-                  className="flex items-center justify-center gap-1.5 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-medium text-slate-200 hover:bg-white/10 hover:text-white transition duration-150 cursor-pointer"
-                  title="Download QR Image"
+                  className="flex items-center justify-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.04] px-4 py-2.5 text-xs font-medium text-zinc-300 hover:bg-white/[0.08] transition cursor-pointer"
+                  title="Download Image"
                 >
-                  <Download className="h-3.5 w-3.5 text-slate-400" />
-                  Save Image
+                  <Download className="h-3.5 w-3.5 text-zinc-400" />
+                  <span>Save</span>
                 </button>
               </div>
             </div>
